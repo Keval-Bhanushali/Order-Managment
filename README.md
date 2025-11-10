@@ -1,136 +1,125 @@
 # Laravel Order Management System
 
-This is a simple Order Management System built with Laravel, featuring customers, products, and orders with order items. The system allows creating customers and orders, listing and updating order statuses, and provides APIs for data retrieval.
+This is a simple Order Management System built with Laravel. It provides web UI and basic APIs to manage Customers, Products and Orders (with Order Items).
+
+Below are setup instructions, brief developer notes, and how to use the newly added Products CRUD section.
 
 ## Prerequisites
 
-- PHP >= 8.x
+- PHP 8.x or later
 - Composer
-- MySQL or supported database
-- Laravel installed globally (optional)
+- MySQL (or another supported database)
+- Node/npm (optional, for frontend tooling)
 
-## Setup Instructions
+## Quick Setup
 
-### 1. Clone/Download Project
+1. Clone the repository and install dependencies
 
-```bash
+```powershell
 git clone <repository-url>
 cd order-management
-```
-
-### 2. Install Dependencies
-
-```bash
 composer install
 ```
 
-### 3. Configure Environment
+2. Environment
 
-Copy `.env.example` to `.env` and setup database credentials:
-
-```bash
-cp .env.example .env
+```powershell
+copy .env.example .env
 ```
 
-Update `.env`:
+Edit `.env` and set your database credentials (DB_DATABASE, DB_USERNAME, DB_PASSWORD).
 
-```
-DB_DATABASE=your_database_name
-DB_USERNAME=your_username
-DB_PASSWORD=your_password
-```
+3. Generate app key
 
-### 4. Generate Application Key
-
-```bash
+```powershell
 php artisan key:generate
 ```
 
-### 5. Run Migrations and Seeders
+4. Run migrations and seeders
 
-Create tables and populate fake data:
-
-```bash
+```powershell
 php artisan migrate --seed
 ```
 
-### 6. Start Development Server
+5. Serve the application
 
-```bash
+```powershell
 php artisan serve
 ```
 
-Visit `http://localhost:8000` in your browser.
+Open: http://127.0.0.1:8000
 
-## Database Structure
+## Products CRUD (new)
 
-Tables:
+I added a full Products CRUD section (controller, views, and routes).
 
-- **customers**: id, name, email, phone, timestamps
-- **products**: id, name, price, stock, timestamps
-- **orders**: id, customer_id, total_amount, status, timestamps
-- **order_items**: id, order_id, product_id, quantity, price, timestamps
+- Routes:
+  - `GET /products` -> products.index
+  - `GET /products/create` -> products.create
+  - `POST /products` -> products.store
+  - `GET /products/{product}` -> products.show
+  - `GET /products/{product}/edit` -> products.edit
+  - `PUT /products/{product}` -> products.update
+  - `DELETE /products/{product}` -> products.destroy
+
+- Files added/updated:
+  - `app/Http/Controllers/ProductController.php` (CRUD logic + validation)
+  - `resources/views/products/index.blade.php` (list, pagination, actions)
+  - `resources/views/products/create.blade.php` (create form)
+  - `resources/views/products/edit.blade.php` (edit form)
+  - `resources/views/products/show.blade.php` (details)
+  - `resources/views/layouts/app.blade.php` (navigation link)
+
+Usage via UI:
+- Visit `/products` to see the product list, create, edit or delete products.
+
+Notes:
+- Product fields: `name`, `price` (decimal), and `stock` (integer).
+- The product select in the Orders create page reads `price` and `stock` attributes to calculate subtotals and validate quantities client-side.
+
+## Database Structure (summary)
+
+- `customers`: id, name, email, phone, timestamps
+- `products`: id, name, price, stock, timestamps
+- `orders`: id, customer_id, total_amount, status, timestamps
+- `order_items`: id, order_id, product_id, quantity, price, timestamps
 
 ## API Endpoints
 
-### Get list of all orders with customers and order details
+You have API endpoints under `routes/api.php` (if enabled). The project includes an example API to list orders with customer and items:
 
 ```
-GET http://localhost:8000/api/orders
+GET /api/orders
 ```
 
-Response example:
+Response includes nested customer and order_items with product info.
 
-```json
-[
-  {
-    "id": 1,
-    "customer": { "id": 1, "name": "John Doe", "email": "john@example.com" },
-    "order_items": [
-      {"product_id": 2, "quantity": 3, "price": "150.00", "product": {"name": "Product A"}}
-    ],
-    "total_amount": "150.00",
-    "status": "pending"
-  }
-]
-```
+## Troubleshooting & Helpful Commands
 
-## Web Routes
+- Clear caches (if routes/config not updated):
 
-- `/customers` - List customers
-- `/customers/create` - Add new customer
-- `/orders` - List orders
-- `/orders/create` - Create new order
-- `/orders/{id}/edit` - Update order status
-
-## Usage
-
-- Create customers via the web form in `/customers/create`.
-- Add new products by manually adding to the database or use seeders.
-- Create orders by selecting a customer and adding one or more products with quantities.
-- View orders list and update their statuses.
-- Use API endpoint `/api/orders` for external integration.
-
-## Seeders
-
-- `ProductsTableSeeder` - Creates 10 fake products with name, price, and stock.
-- `CustomersTableSeeder` - Creates 10 fake customers.
-- `OrdersTableSeeder` - Creates 2 orders per customer with random products and updates stock.
-
-## Notes
-
-- Product stock is checked and reduced automatically when orders are placed.
-- Order status can be `pending`, `completed`, or `cancelled`.
-- Validation ensures customer emails are unique and orders contain at least one item.
-
-## Troubleshooting
-
-- If API returns 404, ensure routes are registered and server running.
-- Clear caches if routes or config not reflecting changes:
-
-```bash
+```powershell
 php artisan route:clear
 php artisan config:clear
+php artisan cache:clear
 ```
 
-- Check `storage/logs/laravel.log` for detailed errors.
+- Re-run migrations (reset and seed):
+
+```powershell
+php artisan migrate:fresh --seed
+```
+
+- Check Laravel logs for errors:
+
+```
+storage/logs/laravel.log
+```
+
+## Next steps / Recommendations
+
+- Prevent deleting products which have order items (business rule) — currently deletion is allowed.
+- Add product search and inline-edit on the products index for faster management.
+- Add role-based access if multiple users manage products/orders.
+
+If you want, I can implement the delete-prevention rule and a small inline-stock editor on the products index next.

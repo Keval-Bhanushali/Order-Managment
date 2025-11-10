@@ -30,6 +30,10 @@
                             class="inline-flex items-center px-1 pt-1 text-gray-500 hover:text-gray-700">
                             <i class="fas fa-users mr-1"></i> Customers
                         </a>
+                        <a href="{{ route('products.index') }}"
+                            class="inline-flex items-center px-1 pt-1 text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-boxes mr-1"></i> Products
+                        </a>
                     </div>
                 </div>
                 <div class="flex items-center space-x-3">
