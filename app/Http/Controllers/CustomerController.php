@@ -45,7 +45,8 @@ class CustomerController extends Controller
      */
     public function show(string $id)
     {
-        //
+        $customer = Customer::with(['orders.orderItems.product'])->findOrFail($id);
+        return view('customers.show', compact('customer'));
     }
 
     /**

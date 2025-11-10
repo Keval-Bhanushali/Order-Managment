@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\Customer;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Response;
 
 class OrderController extends Controller
 {
@@ -127,7 +128,19 @@ class OrderController extends Controller
      */
     public function show(string $id)
     {
-        //
+        $order = Order::with(['customer', 'orderItems.product'])->findOrFail($id);
+        return view('orders.show', compact('order'));
+    }
+
+    public function print(string $id)
+    {
+        $order = Order::with(['customer', 'orderItems.product'])->findOrFail($id);
+        $pdf = view('orders.print', compact('order'));
+
+        return Response::make($pdf, 200, [
+            'Content-Type' => 'text/html',
+            'Content-Disposition' => 'inline; filename="order-' . $id . '.html"'
+        ]);
     }
 
     /**
