@@ -1,19 +1,17 @@
 # Laravel Order Management System
 
-This is a simple Order Management System built with Laravel. It provides web UI and basic APIs to manage Customers, Products and Orders (with Order Items).
-
-Below are setup instructions, brief developer notes, and how to use the newly added Products CRUD section.
+This repository contains a small Order Management application built with Laravel. It provides a web UI and simple API endpoints to manage Customers, Products, Orders and Order Items. Below you'll find setup steps, exact CRUD routes, controller behaviors, the database schema (from migrations), and seeder behavior.
 
 ## Prerequisites
 
 - PHP 8.x or later
 - Composer
 - MySQL (or another supported database)
-- Node/npm (optional, for frontend tooling)
+- Node/npm (optional)
 
 ## Quick Setup
 
-1. Clone the repository and install dependencies
+1. Clone and install dependencies
 
 ```powershell
 git clone <repository-url>
@@ -27,9 +25,9 @@ composer install
 copy .env.example .env
 ```
 
-Edit `.env` and set your database credentials (DB_DATABASE, DB_USERNAME, DB_PASSWORD).
+Update `.env` with database credentials and other settings.
 
-3. Generate app key
+3. Generate application key
 
 ```powershell
 php artisan key:generate
@@ -41,7 +39,7 @@ php artisan key:generate
 php artisan migrate --seed
 ```
 
-5. Serve the application
+5. Serve the app
 
 ```powershell
 php artisan serve
@@ -49,54 +47,125 @@ php artisan serve
 
 Open: http://127.0.0.1:8000
 
-## Products CRUD (new)
+## Routes, Controllers & Views (CRUD details)
 
-I added a full Products CRUD section (controller, views, and routes).
+The app registers the following resources and controller entry points.
 
-- Routes:
-  - `GET /products` -> products.index
-  - `GET /products/create` -> products.create
-  - `POST /products` -> products.store
-  - `GET /products/{product}` -> products.show
-  - `GET /products/{product}/edit` -> products.edit
-  - `PUT /products/{product}` -> products.update
-  - `DELETE /products/{product}` -> products.destroy
+Customers
+- Routes: `Route::resource('customers', CustomerController::class)->only(['index','create','store','show'])` (see `routes/web.php`).
+- Controller: `app/Http/Controllers/CustomerController.php`
+  - index: lists customers (`customers.index` view)
+  - create: shows create form (`customers.create` view)
+  - store: validates and saves customer
+    - Validation rules: name (required, string), email (required, email, unique), phone (nullable)
+  - show: displays customer details with related orders (`customers.show` view)
+  - edit/update/destroy: not implemented (left intentionally blank)
 
-- Files added/updated:
-  - `app/Http/Controllers/ProductController.php` (CRUD logic + validation)
-  - `resources/views/products/index.blade.php` (list, pagination, actions)
-  - `resources/views/products/create.blade.php` (create form)
-  - `resources/views/products/edit.blade.php` (edit form)
-  - `resources/views/products/show.blade.php` (details)
-  - `resources/views/layouts/app.blade.php` (navigation link)
+Products
+- Routes: `Route::resource('products', ProductController::class)` plus a `DELETE` route used by the index listing (see `routes/web.php`).
+- Controller: `app/Http/Controllers/ProductController.php`
+  - index: paginated list, `products.index` view
+  - create: `products.create` view
+  - store: validation and create
+    - Validation: name (required|string|max:255), price (required|numeric|min:0), stock (required|integer|min:0)
+  - show: `products.show`
+  - edit/update: edit form + update
+  - destroy: deletes product (note: no blocking check against order_items yet)
+- Views (added):
+  - `resources/views/products/index.blade.php`
+  - `resources/views/products/create.blade.php`
+  - `resources/views/products/edit.blade.php`
+  - `resources/views/products/show.blade.php`
 
-Usage via UI:
-- Visit `/products` to see the product list, create, edit or delete products.
+Orders
+- Routes: `Route::resource('orders', OrderController::class)->only(['index','create','store','edit','update','show'])` plus `GET orders/{order}/print` and an API listing.
+- Controller: `app/Http/Controllers/OrderController.php`
+  - index: shows orders list (`orders.index`)
+  - apiIndex: returns JSON list of recent orders with nested customer and order_items (used for `GET /api/orders`)
+  - create: loads `customers` and `products` and shows `orders.create` — the order creation UI uses product price and stock for client-side subtotal/stock validation
+  - store: validates request, creates order + order_items inside DB transaction, decrements product stock, computes total_amount
+    - Validation: customer_id (exists:customers,id), products (array|min:1), products.*.product_id (exists:products,id), products.*.quantity (integer|min:1)
+    - If a product lacks sufficient stock, the store transaction throws and rolls back
+  - show: shows order and items
+  - edit/update: update order status (supports cancelling which restores stock)
+  - print: returns an inline HTML representation of the order (used for printing)
 
-Notes:
-- Product fields: `name`, `price` (decimal), and `stock` (integer).
-- The product select in the Orders create page reads `price` and `stock` attributes to calculate subtotals and validate quantities client-side.
+Views used by orders exist under `resources/views/orders/` (create, index, show, edit, print). The `orders.create` view includes client-side JS for dynamic product rows, subtotal/total calculations and stock validation.
 
-## Database Structure (summary)
+## Database schema (from migrations)
 
-- `customers`: id, name, email, phone, timestamps
-- `products`: id, name, price, stock, timestamps
-- `orders`: id, customer_id, total_amount, status, timestamps
-- `order_items`: id, order_id, product_id, quantity, price, timestamps
+These are the current migrations (files under `database/migrations/`), and the exact columns they create:
 
-## API Endpoints
+- `2025_11_10_094955_create_customers_table.php`
+  - id (bigint, pk)
+  - name (string)
+  - email (string, unique)
+  - phone (string, nullable)
+  - timestamps (created_at, updated_at)
 
-You have API endpoints under `routes/api.php` (if enabled). The project includes an example API to list orders with customer and items:
+- `2025_11_10_095004_create_products_table.php`
+  - id (bigint, pk)
+  - name (string)
+  - price (decimal(10,2))
+  - stock (integer, default 0)
+  - timestamps
 
+- `2025_11_10_095010_create_orders_table.php`
+  - id (bigint, pk)
+  - customer_id (foreignId -> customers.id, onDelete cascade)
+  - total_amount (decimal(10,2))
+  - status (enum: pending, completed, cancelled) default pending
+  - timestamps
+
+- `2025_11_10_095017_create_order_items_table.php`
+  - id (bigint, pk)
+  - order_id (foreignId -> orders.id, onDelete cascade)
+  - product_id (foreignId -> products.id, onDelete cascade)
+  - quantity (integer)
+  - price (decimal(10,2)) — stores the price for the line (product.price * quantity at time of order)
+  - timestamps
+
+## Seeders
+
+Seeders are under `database/seeders/` and included by `DatabaseSeeder`:
+
+- `CustomersTableSeeder` — creates 10 fake customers (name, email, phone) using Faker
+- `ProductsTableSeeder` — creates 10 fake products with random price and stock
+- `OrdersTableSeeder` — for each customer creates 2 orders with 3 random products each; it decrements product stock when creating orders
+
+Run seeders with `php artisan db:seed` or combined with migrations in `php artisan migrate --seed`.
+
+## API
+
+- `GET /api/orders` (implemented in `OrderController@apiIndex`) — returns JSON list of orders with nested customer and order_items including product info and current product stock.
+
+Response example (abridged):
+
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": 1,
+      "customer": {"id": 1, "name": "John Doe", "email":"john@example.com"},
+      "order_items": [ {"product_id":2, "quantity":3, "price":"150.00", "product":{"name":"Product A","current_stock":17}} ],
+      "total_amount": "150.00",
+      "status": "pending",
+      "created_at": "2025-11-10T10:00:00Z"
+    }
+  ]
+}
 ```
-GET /api/orders
-```
 
-Response includes nested customer and order_items with product info.
+## Usage notes
 
-## Troubleshooting & Helpful Commands
+- Creating orders reduces product stock automatically. The order creation page enforces a client-side stock check and server-side validation also prevents over-ordering.
+- Cancelling an order restores stock for the items in that order (handled in `OrderController@update`).
+- Customers currently can be created and viewed; edit/delete for customers are not implemented yet.
 
-- Clear caches (if routes/config not updated):
+## Helpful artisan commands
+
+- Clear caches (useful when changing routes or env):
 
 ```powershell
 php artisan route:clear
@@ -104,22 +173,17 @@ php artisan config:clear
 php artisan cache:clear
 ```
 
-- Re-run migrations (reset and seed):
+- Reset database and re-seed (use with caution):
 
 ```powershell
 php artisan migrate:fresh --seed
 ```
 
-- Check Laravel logs for errors:
+## Recommendations / Next steps
 
-```
-storage/logs/laravel.log
-```
+- Prevent deleting products that have order items (business rule) — currently `ProductController@destroy` deletes products outright.
+- Add edit/update for customers if you need to modify customer info from the UI.
+- Add product search and inline stock editing on the products index for faster inventory management.
+- Add authentication/authorization if multiple users will manage orders and products.
 
-## Next steps / Recommendations
-
-- Prevent deleting products which have order items (business rule) — currently deletion is allowed.
-- Add product search and inline-edit on the products index for faster management.
-- Add role-based access if multiple users manage products/orders.
-
-If you want, I can implement the delete-prevention rule and a small inline-stock editor on the products index next.
+If you'd like, I can implement the delete-prevention rule and add an inline stock editor on the products index next. Reply which to prioritize.
